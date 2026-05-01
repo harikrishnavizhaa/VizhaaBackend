@@ -1,0 +1,314 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ORGANIZER
+  SUPPLIER
+  ADMIN
+  EVENT_STAFF
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  BLOCKED
+  REJECTED
+}
+
+enum EventStatus {
+  ACTIVE
+  BOOKED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentType {
+  ADVANCE
+  FINAL
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+model User {
+  id                String       @id @default(uuid())
+  phone             String       @unique
+  name              String?
+  email             String?
+  password          String?
+  role              UserRole
+  status            UserStatus   @default(PENDING)
+  profilePicture    String?
+  
+  // Organizer specific fields
+  organizerType     String?      // e.g., "Wedding Planner", "Corporate Event Manager"
+  
+  // Supplier specific fields
+  aadhaarUrl        String?
+  panUrl            String?
+  transportType     String?      // e.g., "Bike", "Car", "Public Transport"
+  services          String[]     // Array of services offered
+  
+  // Location
+  latitude          Float?
+  longitude         Float?
+  address           String?
+  city              String?
+  state             String?
+  pincode           String?
+  
+  // FCM Token for notifications
+  fcmToken          String?
+  
+  // Timestamps
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  eventsCreated     Event[]      @relation("EventOrganizer")
+  bookings          Booking[]
+  payments          Payment[]
+  wallet            Wallet?
+  notifications     Notification[]
+  sessions          Session[]
+  
+  @@index([phone])
+  @@index([role])
+  @@index([status])
+  @@index([latitude, longitude])
+}
+
+model Event {
+  id                String       @id @default(uuid())
+  organizerId       String
+  organizer         User         @relation("EventOrganizer", fields: [organizerId], references: [id])
+  
+  // Event details
+  name              String
+  description       String?
+  eventType         String       // e.g., "Wedding", "Birthday", "Corporate"
+  date              DateTime
+  startTime         String
+  endTime           String
+  
+  // Location
+  latitude          Float
+  longitude         Float
+  address           String
+  city              String
+  state             String
+  pincode           String
+  
+  // Services and requirements
+  services          String[]     // Array of required services
+  dressCode         String?
+  numberOfPeople    Int?
+  specialInstructions String?
+  
+  // Pricing
+  totalAmount       Float
+  advanceAmount     Float
+  remainingAmount   Float
+  
+  // Status
+  status            EventStatus  @default(ACTIVE)
+  
+  // Attendance tracking
+  attendedCount     Int          @default(0)
+  
+  // Timestamps
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  
+  // Relations
+  bookings          Booking[]
+  payments          Payment[]
+  
+  @@index([organizerId])
+  @@index([status])
+  @@index([date])
+  @@index([latitude, longitude])
+}
+
+model Booking {
+  id                String         @id @default(uuid())
+  eventId           String
+  event             Event          @relation(fields: [eventId], references: [id])
+  supplierId        String
+  supplier          User           @relation(fields: [supplierId], references: [id])
+  
+  // Booking details
+  status            BookingStatus  @default(PENDING)
+  acceptedAt        DateTime?
+  rejectedAt        DateTime?
+  completedAt       DateTime?
+  
+  // Attendance
+  attendanceMarked  Boolean        @default(false)
+  arrivedAt         DateTime?
+  
+  // Timestamps
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  @@unique([eventId, supplierId])
+  @@index([eventId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model Payment {
+  id                String         @id @default(uuid())
+  eventId           String
+  event             Event          @relation(fields: [eventId], references: [id])
+  userId            String
+  user              User           @relation(fields: [userId], references: [id])
+  
+  // Payment details
+  amount            Float
+  type              PaymentType
+  status            PaymentStatus  @default(PENDING)
+  
+  // Razorpay details
+  razorpayOrderId   String?        @unique
+  razorpayPaymentId String?        @unique
+  razorpaySignature String?
+  
+  // Commission (for final payment)
+  commissionAmount  Float          @default(0)
+  supplierAmount    Float          @default(0)
+  
+  // Timestamps
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  paidAt            DateTime?
+  
+  // Relations
+  transaction       Transaction?
+  
+  @@index([eventId])
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+}
+
+model Wallet {
+  id                String         @id @default(uuid())
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id])
+  
+  // Balance
+  balance           Float          @default(0)
+  totalEarnings     Float          @default(0)
+  totalWithdrawals  Float          @default(0)
+  
+  // Bank details (for payout)
+  bankName          String?
+  accountNumber     String?
+  ifscCode          String?
+  accountHolderName String?
+  
+  // Timestamps
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  
+  // Relations
+  transactions      Transaction[]
+  
+  @@index([userId])
+}
+
+model Transaction {
+  id                String           @id @default(uuid())
+  walletId          String
+  wallet            Wallet           @relation(fields: [walletId], references: [id])
+  
+  // Transaction details
+  type              TransactionType
+  amount            Float
+  description       String
+  
+  // Related payment (if applicable)
+  paymentId         String?          @unique
+  payment           Payment?         @relation(fields: [paymentId], references: [id])
+  
+  // Balance after transaction
+  balanceAfter      Float
+  
+  // Timestamps
+  createdAt         DateTime         @default(now())
+  
+  @@index([walletId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model Notification {
+  id                String       @id @default(uuid())
+  userId            String
+  user              User         @relation(fields: [userId], references: [id])
+  
+  // Notification details
+  title             String
+  body              String
+  data              Json?        // Additional data as JSON
+  
+  // Status
+  read              Boolean      @default(false)
+  
+  // FCM details
+  fcmMessageId      String?
+  
+  // Timestamps
+  createdAt         DateTime     @default(now())
+  
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  token     String   @unique
+  deviceId  String
+  createdAt DateTime @default(now())
+}
+

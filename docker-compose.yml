@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: vizhaa-postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: vizhaa
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - vizhaa-network
+    restart: always
+   
+  backend:
+    build: .
+    container_name: vizhaa-backend
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password123}@postgres:5432/${POSTGRES_DB:-vizhaa}?schema=public
+      - JWT_SECRET=${JWT_SECRET:-supersecretkey}
+      - NODE_ENV=production
+    depends_on:
+      - postgres
+    networks:
+      - vizhaa-network
+    restart: always
+    
+volumes:
+  postgres_data:
+
+networks:
+  vizhaa-network:
+    driver: bridge
