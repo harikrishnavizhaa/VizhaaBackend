@@ -3,8 +3,17 @@ const cors = require('cors');
 const helmet = require('helmet');
 const authRoutes = require('./routes/auth');
 const organizerRoutes = require('./routes/organizer');
+const eventRoutes = require('./routes/event');
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
+
+// Custom Logger to see API calls in terminal
+app.use((req, res, next) => {
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`[${timestamp}] ${req.method} ${req.url}`);
+  next();
+});
 
 app.use(helmet());
 app.use(cors());
@@ -32,5 +41,7 @@ app.use((req, res, next) => {
 app.get('/health', (_, res) => res.json({ status: 'ok', service: 'vizhaa-api' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/organizer', organizerRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/payments', paymentRoutes);
 
 module.exports = app;

@@ -22,6 +22,7 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   refreshTokens RefreshToken[]
+  events        Event[]
 }
 
 model RefreshToken {
@@ -42,4 +43,26 @@ model Otp {
   code      String
   expiresAt DateTime
   createdAt DateTime @default(now())
+}
+
+model Event {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  name            String
+  type            String
+  location        String
+  date            String
+  inTime          String
+  outTime         String
+  suppliers       Int
+  dressCode       String
+  services        String[]
+  costPerHead     Float
+  totalCost       Float
+  advancePaid     Float
+  status          String   @default("Upcoming") // Upcoming, In Progress, Completed
+  progress        Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

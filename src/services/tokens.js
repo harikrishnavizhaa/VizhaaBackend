@@ -1,9 +1,8 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const config = require('../config');
 
-const prisma = new PrismaClient();
 
 const generateAccessToken = (userId) =>
   jwt.sign({ sub: userId }, config.jwtSecret, { expiresIn: config.jwtExpiresIn });

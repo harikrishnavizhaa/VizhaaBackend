@@ -1,9 +1,7 @@
-const axios = require('axios');
-const { PrismaClient } = require('@prisma/client');
-const msg91 = require('../services/msg91');
+const prisma = require('../lib/prisma');
+const twilio = require('../services/twilio');
 const tokens = require('../services/tokens');
 
-const prisma = new PrismaClient();
 const phoneRegex = /^[6-9]\d{9}$/;
 
 const sendOtp = async (req, res) => {
@@ -11,19 +9,37 @@ const sendOtp = async (req, res) => {
   if (!mobile || !phoneRegex.test(mobile)) {
     return res.status(400).json({ success: false, message: 'Enter valid mobile number' });
   }
-  // TESTING MODE: skip MSG91, just acknowledge
-  return res.json({ success: true });
+  
+  try {
+    await twilio.sendOtp(mobile);
+    return res.json({ success: true, message: 'OTP sent successfully' });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: 'Failed to send OTP', error: err.message });
+  }
 };
 
 const verifyOtp = async (req, res) => {
-  try {
-    const mobile = req.body.mobile?.trim();
+  const { mobile, otp } = req.body;
 
-    if (!mobile || !phoneRegex.test(mobile)) {
-      return res.status(400).json({ success: false, message: 'Invalid mobile number' });
+  if (!mobile || !phoneRegex.test(mobile)) {
+    return res.status(400).json({ success: false, message: 'Invalid mobile number' });
+  }
+
+  if (!otp) {
+    return res.status(400).json({ success: false, message: 'OTP is required' });
+  }
+
+  try {
+    const isVerified = await twilio.verifyOtp(mobile, otp);
+    
+    if (!isVerified.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP',
+        status: isVerified.status,
+      });
     }
 
-    // TESTING MODE: no OTP validation — any input passes
     const existingUser = await prisma.user.findUnique({ where: { mobile } });
 
     const user = await prisma.user.upsert({
@@ -37,16 +53,18 @@ const verifyOtp = async (req, res) => {
 
     return res.json({
       success: true,
+      message: "OTP Verified",
       isNewUser: !existingUser,
       accessToken,
       refreshToken,
       user: { id: user.id, mobile: user.mobile },
     });
   } catch (error) {
-    console.log(error.response?.data || error.message);
-    return res.status(400).json({
+    console.error('Verify OTP Error:', error);
+    return res.status(500).json({
       success: false,
-      error: error.response?.data || error.message,
+      message: 'OTP verification failed',
+      error: error.message,
     });
   }
 };
@@ -60,10 +78,10 @@ const resendOtp = async (req, res) => {
     });
   }
   try {
-    await msg91.resendOtp(`91${mobile}`);
-    res.json({ success: true });
+    await twilio.sendOtp(mobile);
+    res.json({ success: true, message: 'OTP resent successfully' });
   } catch (err) {
-    res.status(502).json({ message: err.message });
+    res.status(500).json({ success: false, message: 'Failed to resend OTP', error: err.message });
   }
 };
 

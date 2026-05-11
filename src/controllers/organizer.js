@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
+
 
 const updateProfile = async (req, res) => {
   const userId = req.user.sub; // sub from JWT payload
