@@ -33,32 +33,26 @@ const createOrder = async (req, res) => {
 };
 
 const verifyPayment = async (req, res) => {
-  const { 
-    razorpay_order_id, 
-    razorpay_payment_id, 
-    razorpay_signature,
-    eventData 
-  } = req.body;
-
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, eventData } = req.body;
   const userId = req.user.sub;
 
   try {
-    const sign = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSign = crypto
-      .createHmac("sha256", config.razorpay.keySecret)
-      .update(sign.toString())
-      .digest("hex");
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac('sha256', config.razorpay.keySecret)
+      .update(body.toString())
+      .digest('hex');
 
-    if (razorpay_signature === expectedSign) {
-      // Create the event now that payment is confirmed
+    if (expectedSignature === razorpay_signature) {
       const event = await prisma.event.create({
         data: {
           userId,
           name: eventData.name,
           type: eventData.type,
           location: eventData.location,
-          date: eventData.date,
+          inDate: eventData.inDate,
           inTime: eventData.inTime,
+          outDate: eventData.outDate,
           outTime: eventData.outTime,
           suppliers: parseInt(eventData.suppliers),
           dressCode: eventData.dressCode,
@@ -67,9 +61,7 @@ const verifyPayment = async (req, res) => {
           totalCost: parseFloat(eventData.totalCost),
           advancePaid: parseFloat(eventData.advancePaid),
           status: 'Upcoming',
-          progress: 0,
-          paymentId: razorpay_payment_id,
-          orderId: razorpay_order_id
+          progress: 0
         }
       });
 
@@ -86,5 +78,6 @@ const verifyPayment = async (req, res) => {
     res.status(500).json({ success: false, message: 'Verification or creation failed', error: error.message });
   }
 };
+
 
 module.exports = { createOrder, verifyPayment };

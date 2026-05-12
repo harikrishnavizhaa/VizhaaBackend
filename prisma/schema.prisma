@@ -52,8 +52,9 @@ model Event {
   name            String
   type            String
   location        String
-  date            String
+  inDate          String
   inTime          String
+  outDate         String
   outTime         String
   suppliers       Int
   dressCode       String
