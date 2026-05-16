@@ -2,8 +2,8 @@ const prisma = require('../lib/prisma');
 
 
 const updateProfile = async (req, res) => {
-  const userId = req.user.sub; // sub from JWT payload
-  const { name, email, companyName, businessType, businessName, city, address, gst } = req.body;
+  const userId = req.user.sub; 
+  const { name, email, role, dob, gender, companyName, businessType, businessName, city, address, gst } = req.body;
 
   try {
     const user = await prisma.user.update({
@@ -11,6 +11,9 @@ const updateProfile = async (req, res) => {
       data: {
         name,
         email,
+        role,
+        gender,
+        dob: dob ? new Date(dob) : undefined,
         companyName,
         businessType,
         businessName,
@@ -28,6 +31,10 @@ const updateProfile = async (req, res) => {
         mobile: user.mobile,
         name: user.name,
         email: user.email,
+        role: user.role,
+        gender: user.gender,
+        dob: user.dob,
+        city: user.city,
         businessName: user.businessName,
         companyName: user.companyName,
         businessType: user.businessType,
